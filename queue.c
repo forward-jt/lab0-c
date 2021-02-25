@@ -5,6 +5,10 @@
 #include "harness.h"
 #include "queue.h"
 
+/* static functions used for sorting */
+static void divide(queue_t *a, queue_t *b);
+static void merge(queue_t *a, volatile queue_t *b);
+
 /*
  * Create empty queue.
  * Return NULL if could not allocate space.
@@ -181,6 +185,57 @@ void q_reverse(queue_t *q)
  */
 void q_sort(queue_t *q)
 {
-    /* TODO: You need to write the code for this function */
-    /* TODO: Remove the above comment when you are about to implement. */
+    if (!q || !(q->head) || !(q->head->next))
+        return;
+
+    queue_t b;
+    divide(q, &b);
+    q_sort(q);
+    q_sort(&b);
+    merge(q, &b);
+}
+
+/*
+ * Attempt to divide elements of a into b
+ */
+static void divide(queue_t *a, queue_t *b)
+{
+    b->size = a->size / 2;
+    b->tail = a->tail;
+
+    list_ele_t *cut = a->head;
+    for (size_t i = b->size; i > 1; i--)
+        cut = cut->next;
+
+    b->head = cut->next;
+
+    cut->next = NULL;
+    a->tail = &(cut->next);
+    a->size -= b->size;
+}
+
+/*
+ * Attempt to merge a and b into a in acensing order.
+ */
+static void merge(queue_t *a, volatile queue_t *b)
+{
+    list_ele_t *tmp, **ori_tail = a->tail;
+    for (a->tail = &(a->head); *(a->tail) && b->head;
+         a->tail = &((*(a->tail))->next)) {
+        if (strcmp((*(a->tail))->value, b->head->value) > 0) {
+            tmp = b->head;
+            b->head = b->head->next;
+
+            tmp->next = *(a->tail);
+            *(a->tail) = tmp;
+        }
+    }
+
+    if (b->head) {
+        *(a->tail) = b->head;
+        a->tail = b->tail;
+    } else
+        a->tail = ori_tail;
+
+    a->size += b->size;
 }
