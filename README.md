@@ -11,8 +11,8 @@ of the skills tested are:
 * Implementing robust code that operates correctly with invalid arguments, including NULL pointers.
 
 The lab involves implementing a queue, supporting both last-in, first-out (LIFO) and first-in-first-out (FIFO)
-queueing disciplines. The underlying data structure is a singly-linked list, enhanced to make some of the
-operations more efficient.
+queueing disciplines. The underlying data structure is a circular doubly-linked list, enhanced to make some of
+the operations more efficient.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ There are a few prerequisites which must be installed on your machine before you
 be able to build and run the autograders.
 
 The following command will install all required and optional dependencies on Ubuntu
-Linux 18.04 or later:
+Linux 20.04 or later:
 ```shell
 $ sudo apt install build-essential git clang-format cppcheck aspell colordiff valgrind
 ```
@@ -34,7 +34,7 @@ $ sudo snap install cppcheck
 $ export PATH=/snap/bin:$PATH
 ```
 
-## Integrate clang-format to vim
+## Integrate `clang-format` to `vim`
 If you want to run `clang-format` automatically after saving with vim, 
 clang-format supports integration for vim according to [Clang 11 documentation](https://clang.llvm.org/docs/ClangFormat.html). 
 
@@ -78,7 +78,7 @@ Extra options can be recognized by make:
 * `VERBOSE`: control the build verbosity. If `VERBOSE=1`, echo eacho command in build process.
 * `SANITIZER`: enable sanitizer(s) directed build. At the moment, AddressSanitizer is supported.
 
-## Using qtest
+## Using `qtest`
 
 `qtest` provides a command interpreter that can create and manipulate queues.
 
@@ -109,7 +109,7 @@ Trace files
 * traces/trace-XX-CAT.cmd : Trace files used by the driver.  These are input files for `qtest`.
   * They are short and simple.
   * We encourage to study them to see what tests are being performed.
-  * XX is the trace number (1-15).  CAT describes the general nature of the test.
+  * XX is the trace number (1-17).  CAT describes the general nature of the test.
 * traces/trace-eg.cmd : A simple, documented trace file to demonstrate the operation of `qtest`
 
 ## Debugging Facilities
@@ -155,11 +155,18 @@ cmd>
   (gdb) 
   ```
 
+## User-friendly command line
+[linenoise](https://github.com/antirez/linenoise) was integrated into `qtest`, providing the following user-friendly features:
+* Move cursor by right and left key
+* Get previous or next command typed before by up and down key
+* Auto completion by TAB
+
 ## License
 
-`lab0-c`is released under the BSD 2 clause license. Use of this source code is governed by
+`lab0-c` is released under the BSD 2 clause license. Use of this source code is governed by
 a BSD-style license that can be found in the LICENSE file.
 
 External source code:
 * [dudect](https://github.com/oreparaz/dudect): public domain
 * [git-good-commit](https://github.com/tommarshall/git-good-commit): MIT License
+* [linenoise](https://github.com/antirez/linenoise): BSD 2-Clause "Simplified" License

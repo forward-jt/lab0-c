@@ -1,5 +1,7 @@
 /* Implementation of simple command-line interface */
 
+#include "console.h"
+
 #include <ctype.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -13,11 +15,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "console.h"
 #include "report.h"
 
 /* Some global values */
-bool simulation = false;
+int simulation = 0;
 static cmd_ptr cmd_list = NULL;
 static param_ptr param_list = NULL;
 static bool block_flag = false;
@@ -55,10 +56,11 @@ static int fd_max = 0;
 /* Parameters */
 static int err_limit = 5;
 static int err_cnt = 0;
-static bool echo = 0;
+static int echo = 0;
 
 static bool quit_flag = false;
 static char *prompt = "cmd> ";
+static bool has_infile = false;
 
 /* Optional function to call as part of exit process */
 /* Maximum number of quit functions */
@@ -67,48 +69,12 @@ static char *prompt = "cmd> ";
 static cmd_function quit_helpers[MAXQUIT];
 static int quit_helper_cnt = 0;
 
-static bool do_quit_cmd(int argc, char *argv[]);
-static bool do_help_cmd(int argc, char *argv[]);
-static bool do_option_cmd(int argc, char *argv[]);
-static bool do_source_cmd(int argc, char *argv[]);
-static bool do_log_cmd(int argc, char *argv[]);
-static bool do_time_cmd(int argc, char *argv[]);
-static bool do_comment_cmd(int argc, char *argv[]);
-
 static void init_in();
 
 static bool push_file(char *fname);
 static void pop_file();
 
 static bool interpret_cmda(int argc, char *argv[]);
-
-/* Initialize interpreter */
-void init_cmd()
-{
-    cmd_list = NULL;
-    param_list = NULL;
-    err_cnt = 0;
-    quit_flag = false;
-
-    add_cmd("help", do_help_cmd, "                | Show documentation");
-    add_cmd("option", do_option_cmd,
-            " [name val]     | Display or set options");
-    add_cmd("quit", do_quit_cmd, "                | Exit program");
-    add_cmd("source", do_source_cmd,
-            " file           | Read commands from source file");
-    add_cmd("log", do_log_cmd, " file           | Copy output to file");
-    add_cmd("time", do_time_cmd, " cmd arg ...    | Time command execution");
-    add_cmd("#", do_comment_cmd, " ...            | Display comment");
-    add_param("simulation", (int *) &simulation, "Start/Stop simulation mode",
-              NULL);
-    add_param("verbose", &verblevel, "Verbosity level", NULL);
-    add_param("error", &err_limit, "Number of errors until exit", NULL);
-    add_param("echo", (int *) &echo, "Do/don't echo commands", NULL);
-
-    init_in();
-    init_time(&last_time);
-    first_time = last_time;
-}
 
 /* Add a new command */
 void add_cmd(char *name, cmd_function operation, char *documentation)
@@ -160,10 +126,10 @@ static char **parse_args(char *line, int *argcp)
     size_t len = strlen(line);
     /* First copy into buffer with each substring null-terminated */
     char *buf = malloc_or_fail(len + 1, "parse_args");
+    buf[len] = '\0';
     char *src = line;
     char *dst = buf;
     bool skipping = true;
-
     int c;
     int argc = 0;
     while ((c = *src++) != '\0') {
@@ -210,7 +176,6 @@ static bool interpret_cmda(int argc, char *argv[])
 {
     if (argc == 0)
         return true;
-
     /* Try to find matching command */
     cmd_ptr next_cmd = cmd_list;
     bool ok = true;
@@ -264,7 +229,7 @@ void set_echo(bool on)
 }
 
 /* Built-in commands */
-static bool do_quit_cmd(int argc, char *argv[])
+static bool do_quit(int argc, char *argv[])
 {
     cmd_ptr c = cmd_list;
     bool ok = true;
@@ -292,7 +257,7 @@ static bool do_quit_cmd(int argc, char *argv[])
     return ok;
 }
 
-static bool do_help_cmd(int argc, char *argv[])
+static bool do_help(int argc, char *argv[])
 {
     cmd_ptr clist = cmd_list;
     report(1, "Commands:", argv[0]);
@@ -336,7 +301,7 @@ bool get_int(char *vname, int *loc)
     return true;
 }
 
-static bool do_option_cmd(int argc, char *argv[])
+static bool do_option(int argc, char *argv[])
 {
     if (argc == 1) {
         param_ptr plist = param_list;
@@ -383,7 +348,7 @@ static bool do_option_cmd(int argc, char *argv[])
     return true;
 }
 
-static bool do_source_cmd(int argc, char *argv[])
+static bool do_source(int argc, char *argv[])
 {
     if (argc < 2) {
         report(1, "No source file given");
@@ -398,7 +363,7 @@ static bool do_source_cmd(int argc, char *argv[])
     return true;
 }
 
-static bool do_log_cmd(int argc, char *argv[])
+static bool do_log(int argc, char *argv[])
 {
     if (argc < 2) {
         report(1, "No log file given");
@@ -412,7 +377,7 @@ static bool do_log_cmd(int argc, char *argv[])
     return result;
 }
 
-static bool do_time_cmd(int argc, char *argv[])
+static bool do_time(int argc, char *argv[])
 {
     double delta = delta_time(&last_time);
     bool ok = true;
@@ -432,6 +397,31 @@ static bool do_time_cmd(int argc, char *argv[])
     return ok;
 }
 
+/* Initialize interpreter */
+void init_cmd()
+{
+    cmd_list = NULL;
+    param_list = NULL;
+    err_cnt = 0;
+    quit_flag = false;
+
+    ADD_COMMAND(help, "                | Show documentation");
+    ADD_COMMAND(option, " [name val]     | Display or set options");
+    ADD_COMMAND(quit, "                | Exit program");
+    ADD_COMMAND(source, " file           | Read commands from source file");
+    ADD_COMMAND(log, " file           | Copy output to file");
+    ADD_COMMAND(time, " cmd arg ...    | Time command execution");
+    add_cmd("#", do_comment_cmd, " ...            | Display comment");
+    add_param("simulation", &simulation, "Start/Stop simulation mode", NULL);
+    add_param("verbose", &verblevel, "Verbosity level", NULL);
+    add_param("error", &err_limit, "Number of errors until exit", NULL);
+    add_param("echo", &echo, "Do/don't echo commands", NULL);
+
+    init_in();
+    init_time(&last_time);
+    first_time = last_time;
+}
+
 /* Create new buffer for named file.
  * Name == NULL for stdin.
  * Return true if successful.
@@ -439,6 +429,7 @@ static bool do_time_cmd(int argc, char *argv[])
 static bool push_file(char *fname)
 {
     int fd = fname ? open(fname, O_RDONLY) : STDIN_FILENO;
+    has_infile = fname ? true : false;
     if (fd < 0)
         return false;
 
@@ -529,17 +520,6 @@ static char *readline()
     return linebuf;
 }
 
-/* Determine if there is a complete command line in input buffer */
-static bool read_ready()
-{
-    for (int i = 0; buf_stack && i < buf_stack->cnt; i++) {
-        if (buf_stack->bufptr[i] == '\n')
-            return true;
-    }
-
-    return false;
-}
-
 static bool cmd_done()
 {
     return !buf_stack || quit_flag;
@@ -561,14 +541,8 @@ int cmd_select(int nfds,
                fd_set *exceptfds,
                struct timeval *timeout)
 {
-    char *cmdline;
     int infd;
     fd_set local_readset;
-    while (!block_flag && read_ready()) {
-        cmdline = readline();
-        interpret_cmd(cmdline);
-        prompt_flag = true;
-    }
 
     if (cmd_done())
         return 0;
@@ -602,9 +576,12 @@ int cmd_select(int nfds,
         /* Commandline input available */
         FD_CLR(infd, readfds);
         result--;
-        cmdline = readline();
-        if (cmdline)
-            interpret_cmd(cmdline);
+        if (has_infile) {
+            char *cmdline;
+            cmdline = readline();
+            if (cmdline)
+                interpret_cmd(cmdline);
+        }
     }
     return result;
 }
@@ -613,8 +590,50 @@ bool finish_cmd()
 {
     bool ok = true;
     if (!quit_flag)
-        ok = ok && do_quit_cmd(0, NULL);
+        ok = ok && do_quit(0, NULL);
+    has_infile = false;
     return ok && err_cnt == 0;
+}
+
+static bool cmd_maybe(const char *target, const char *src)
+{
+    for (int i = 0; i < strlen(src); i++) {
+        if (target[i] == '\0')
+            return false;
+        if (src[i] != target[i])
+            return false;
+    }
+    return true;
+}
+
+void completion(const char *buf, linenoiseCompletions *lc)
+{
+    if (strncmp("option ", buf, 7) == 0) {
+        param_ptr plist = param_list;
+
+        while (plist) {
+            char str[128] = "";
+            // if parameter is too long, now we just ignore it
+            if (strlen(plist->name) > 120)
+                continue;
+
+            strcat(str, "option ");
+            strcat(str, plist->name);
+            if (cmd_maybe(str, buf))
+                linenoiseAddCompletion(lc, str);
+
+            plist = plist->next;
+        }
+        return;
+    }
+
+    cmd_ptr clist = cmd_list;
+    while (clist) {
+        if (cmd_maybe(clist->name, buf))
+            linenoiseAddCompletion(lc, clist->name);
+
+        clist = clist->next;
+    }
 }
 
 bool run_console(char *infile_name)
@@ -624,7 +643,18 @@ bool run_console(char *infile_name)
         return false;
     }
 
-    while (!cmd_done())
-        cmd_select(0, NULL, NULL, NULL, NULL);
+    if (!has_infile) {
+        char *cmdline;
+        while ((cmdline = linenoise(prompt)) != NULL) {
+            interpret_cmd(cmdline);
+            linenoiseHistoryAdd(cmdline);       /* Add to the history. */
+            linenoiseHistorySave(HISTORY_FILE); /* Save the history on disk. */
+            linenoiseFree(cmdline);
+        }
+    } else {
+        while (!cmd_done())
+            cmd_select(0, NULL, NULL, NULL, NULL);
+    }
+
     return err_cnt == 0;
 }

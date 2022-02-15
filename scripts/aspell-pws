@@ -128,3 +128,16 @@ signal
 srand
 sscanf
 macOS
+Arm
+cpu
+linenoise
+vim
+lldb
+utf
+unicode
+checksum
+sha
+shasum
+verifier
+CI
+foreach

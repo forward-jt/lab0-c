@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-CPPCHECK_suppresses="--inline-suppr harness.c --suppress=unmatchedSuppression:harness.c --suppress=missingIncludeSystem"
+CPPCHECK_suppresses="--inline-suppr harness.c --suppress=unmatchedSuppression:harness.c --suppress=missingIncludeSystem \
+--suppress=unusedFunction:linenoise.c --suppress=variableScope:linenoise.c \
+--suppress=nullPointerRedundantCheck:report.c \
+--suppress=nullPointer:qtest.c"
 CPPCHECK_OPTS="-I. --enable=all --error-exitcode=1 --force $CPPCHECK_suppresses ."
 
 RETURN=0
@@ -15,14 +18,18 @@ if [ $? -ne 0 ]; then
     echo "[!] cppcheck not installed. Unable to perform static analysis." >&2
     exit 1
 fi
-# Expected Cppcheck version is 1.90
-# FIXME: extract version number for 2.xx
-CPPCHECK_VER=$($CPPCHECK --version | sed -Ee 's/Cppcheck 1.([0-9]+)/\1/;q')
-if [ $CPPCHECK_VER -lt 90 ]; then
-    echo "[!] cppcheck version must be at least 1.90." >&2
-    echo -e "    Check 'Developer Info' for building Cppcheck from source:\n" \
-            "          http://cppcheck.sourceforge.net/devinfo/" >&2
-    exit 1
+
+# Expected Cppcheck version is 1.90+
+# First, Cppcheck 2.x
+if [ -z "$($CPPCHECK --version | grep -E '^Cppcheck\s2')" ]; then
+    # Second, Cppcheck 1.x
+    CPPCHECK_VER=$($CPPCHECK --version | sed -Ee 's/Cppcheck 1.([0-9]+)/\1/;q')
+    if [ $CPPCHECK_VER -lt 90 ]; then
+        echo "[!] cppcheck version must be at least 1.90." >&2
+        echo -e "    Check 'Developer Info' for building Cppcheck from source:\n" \
+                "          http://cppcheck.sourceforge.net/devinfo/" >&2
+        exit 1
+    fi
 fi
 
 ASPELL=$(which aspell)
@@ -34,6 +41,11 @@ fi
 DIFF=$(which colordiff)
 if [ $? -ne 0 ]; then
     DIFF=diff
+fi
+
+SHA1SUM=$(which sha1sum)
+if [ $? -ne 0 ]; then
+    SHA1SUM=shasum
 fi
 
 FILES=`git diff --cached --name-only --diff-filter=ACMR | grep -E "\.(c|cpp|h)$"`
@@ -63,8 +75,16 @@ for FILE in $FILES; do
     fi
 done
 
-echo "Following files need to be cleaned up:"
-echo "${FILES[*]}"
+if [ ! -z "${FILES[*]}" ]; then
+    echo "Following files need to be cleaned up:"
+    echo "${FILES[*]}"
+fi
+
+$SHA1SUM -c scripts/checksums >/dev/null
+if [ $? -ne 0 ]; then
+    echo "[!] You are not allowed to change the header file queue.h or list.h" >&2
+    exit 1
+fi
 
 # Prevent unsafe functions
 root=$(git rev-parse --show-toplevel)

@@ -1,4 +1,4 @@
-# Test of insert_head, insert_tail, remove_head, reverse, size, and sort
+# Test of insert_head, insert_tail, remove_head, reverse, size, swap, and sort
 option fail 0
 option malloc 0
 new
@@ -15,10 +15,14 @@ rh dolphin
 reverse
 size
 sort
-rh bear
-rh bear
-rh gerbil
-rh gerbil
+it fish
+swap
+reverse
 rh meerkat
+rh fish
+rh gerbil
+rh gerbil
+rh bear
+rh bear
 size
 free
